@@ -11,7 +11,7 @@ using ZoneContext = ___tracy_c_zone_context;
 using SourceLocation = ___tracy_source_location_data;
 
 static std::stack<ZoneContext> zoneStack{};
-static std::array<SourceLocation*, 64000> sourceLocations{};
+static std::array<SourceLocation*, 512000> sourceLocations{};
 static std::atomic<int> nextSourceLocationIndex{0};
 
 static bool active = false;
@@ -36,8 +36,8 @@ extern "C" int64_t RegisterSourceFunction(const char* function, int strLen) {
     const_cast<char*>(srcLocation->name)[strLen] = 0;
 
     srcLocation->function = "";
-    srcLocation->file = "<unknown>";
-    srcLocation->line = 0xFFFFFFFF;
+    srcLocation->file = "";
+    srcLocation->line = 0;
     srcLocation->color = 0;
 
     auto idx = atomic_fetch_add(&nextSourceLocationIndex, 1);
