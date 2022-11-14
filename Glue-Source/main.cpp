@@ -1,3 +1,5 @@
+#include <cstdlib>
+#include <exception>
 #include <ios>
 #include <iostream>
 #include <tracy/Tracy.hpp>
@@ -11,7 +13,7 @@ using ZoneContext = ___tracy_c_zone_context;
 using SourceLocation = ___tracy_source_location_data;
 
 static std::stack<ZoneContext> zoneStack{};
-static std::array<SourceLocation*, 512000> sourceLocations{};
+static std::array<SourceLocation*, 1 << 21> sourceLocations;
 static std::atomic<int> nextSourceLocationIndex{0};
 
 static bool active = false;
@@ -21,19 +23,20 @@ extern "C" void BeginZone(int64_t zoneId) {
 
     zoneStack.push(___tracy_emit_zone_begin(sourceLocations[zoneId], true));
 }
+
 extern "C" void EndZone() {
     if (!active) return;
 
-    const auto& cz = zoneStack.top();
+    const auto &cz = zoneStack.top();
     ___tracy_emit_zone_end(cz);
     zoneStack.pop();
 }
 
-extern "C" int64_t RegisterSourceFunction(const char* function, int strLen) {
-    auto* srcLocation = new SourceLocation();
-    srcLocation->name = (const char*)malloc(strLen + 1);
-    memcpy((void*)srcLocation->name, function, strLen);
-    const_cast<char*>(srcLocation->name)[strLen] = 0;
+extern "C" int64_t RegisterSourceFunction(const char *function, int strLen) {
+    auto *srcLocation = new SourceLocation();
+    srcLocation->name = (const char *) malloc(strLen + 1);
+    memcpy((void *) srcLocation->name, function, strLen);
+    const_cast<char *>(srcLocation->name)[strLen] = 0;
 
     srcLocation->function = "";
     srcLocation->file = "";
