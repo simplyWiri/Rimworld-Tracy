@@ -55,8 +55,6 @@ namespace Profiler
         public ModBase(ModContentPack content) : base(content) {
             harmony = new Harmony("wiri.tracy_profiler_rimworld");
             
-            Startup();
-            
             obj = new UnityEngine.GameObject("TracyProfilerComponent");
             obj.AddComponent<TracyProfilerComponent>();
             UnityEngine.Object.DontDestroyOnLoad(obj);
@@ -225,6 +223,13 @@ namespace Profiler
     {
         private bool state = false;
         private bool firstTime = true;
+
+        static bool IsSimpleMethod(MethodBase method) {
+            var insts = PatchProcessor.GetOriginalInstructions(method);
+            return insts.Count < 15 && insts.All(a => (a.operand is MethodBase methodBase &&
+                                                       (methodBase == method || IsSimpleMethod(methodBase)) ||
+                                                       a.operand is not MethodBase));
+        }
         
         void OnGUI() {
             var text = state ? "Disable" : "Enable";
@@ -235,16 +240,19 @@ namespace Profiler
                     var transpiler = new HarmonyMethod(typeof(ModBase), nameof(ModBase.Transpiler));
                     foreach(var method in typeof(Pawn).Assembly
                                                       .GetTypes()
-                                                      .Where(t => !t.IsGenericType)
+                                                      .Where(t => !t.IsGenericType && !t.HasAttribute<CompilerGeneratedAttribute>())
                                                       .SelectMany(t => AccessTools.GetDeclaredMethods(t))
                                                       .Where(m => !(!m.HasMethodBody() || m.IsGenericMethod || m.ContainsGenericParameters || m.IsGenericMethodDefinition || m.IsSecurityCritical || m.IsAbstract))) {
                         // Harmony is bugged currently.
                         if (method.DeclaringType.IsValueType) continue;
-                        
+                        if (IsSimpleMethod(method)) continue;
+
                         ModBase.harmony.Patch(method, transpiler: transpiler);
                     }
+                    
                     firstTime = false;
-            }
+                    ModBase.Startup();
+                }
                 
                 ModBase.ToggleActive();
                 state = !state;
